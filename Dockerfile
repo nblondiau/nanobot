@@ -11,8 +11,18 @@ RUN mkdir -p /app/nanobot/web && npm run build
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates git bubblewrap openssh-client libmagic1 && \
+    apt-get install -y --no-install-recommends ca-certificates curl git bubblewrap openssh-client libmagic1 && \
     rm -rf /var/lib/apt/lists/*
+
+# Reuse the WebUI builder's Node runtime so node/npm/npx are available to the
+# agent at runtime and match the version used to build the bundle exactly. The
+# built-in `clawhub` and `weather` skills, the skills.sh marketplace, and
+# npx-based MCP server presets all shell out to these CLIs. Both stages are
+# Debian bookworm, so the glibc-linked binary is portable.
+COPY --from=webui-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=webui-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 WORKDIR /app
 
